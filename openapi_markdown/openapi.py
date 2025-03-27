@@ -65,7 +65,9 @@ class Content(MarkdownObject):
                  link: Optional[str] = None,
                  end: str = "",
                  indent: int = 0,
-                 blockquote_level: int = 0):
+                 blockquote_level: int = 0,
+                 order: Optional[int] = None,
+                 unordered: bool = False):
         self.content = content
         self.bold = bold
         self.italic = italic
@@ -74,6 +76,8 @@ class Content(MarkdownObject):
         self.end = end
         self.indent = indent
         self.blockquote_level = blockquote_level
+        self.order = order
+        self.unordered = unordered
 
     def export(self):
         output = self.content
@@ -86,7 +90,14 @@ class Content(MarkdownObject):
         if self.link:
             output = f"[{output}]({self.link})"
         blockquote = ">" * self.blockquote_level + " " if self.blockquote_level > 0 else ""
-        return " "*self.indent + blockquote + output + self.end
+        content = blockquote + output + self.end
+        if self.order is not None and self.unordered:
+            raise ValueError("Cannot have both order and unordered set at the same time")
+        if self.order is not None:
+            content = f"{self.order}. " + content
+        if self.unordered:
+            content = "- " + content
+        return " "*self.indent + content
 
 
 class Code(MarkdownObject):
@@ -137,3 +148,28 @@ def load_api(url_or_dict: Union[str, dict]) -> OpenAPI:
     else:
         response = requests.get(url_or_dict)
         return parse_obj(response.json())
+
+
+class RequestFunc(Enum):
+
+    GET = "get"
+    POST = "post"
+    PUT = "put"
+    DELETE = "delete"
+
+
+def get_request_func(path_item: PathItem) -> Optional[RequestFunc]:
+    for func in RequestFunc:
+        if getattr(path_item, func.value) is not None:
+            return func
+    return None
+
+
+def create_md_summary(openapi: OpenAPI) -> List[MarkdownObject]:
+    md_objs = []
+    md_objs.append(Header("Summary", 1))
+    md_objs.append(Content("Project Name:", end=" ", unordered=True))
+    md_objs.append(Code(openapi.info.title, block=False, end="\n\n"))
+    md_objs.append(Content("Version: ", end=" ", unordered=True))
+    md_objs.append(Code(openapi.info.version, block=False, end="\n\n"))
+    return md_objs
