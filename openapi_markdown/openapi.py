@@ -172,4 +172,29 @@ def create_md_summary(openapi: OpenAPI) -> List[MarkdownObject]:
     md_objs.append(Code(openapi.info.title, block=False, end="\n\n"))
     md_objs.append(Content("Version: ", end=" ", unordered=True))
     md_objs.append(Code(openapi.info.version, block=False, end="\n\n"))
+    md_objs.append(Header("Default", 1))
+
     return md_objs
+
+
+def create_md_paths(openapi: OpenAPI) -> List[MarkdownObject]:
+    md_objs = []
+    for path_name, path_item in openapi.paths.items():
+        func = get_request_func(path_item)
+        if func is None:
+            continue
+        path_alias = "root" if path_name == "/" else path_name.lstrip("/")
+        md_objs.append(HtmlObject("", HtmlTag.A, id=f"opId{path_alias}__{func.value}"))
+        md_objs.append(Header(f"{func.value.upper()} {path_alias.capitalize()}", 2))
+        md_objs.append(Content(f"{func.value.upper()} {path_name}"))
+    return md_objs
+
+
+if __name__ == "__main__":
+    openapi = load_api("http://127.0.0.1:8000/openapi.json")
+
+    over_all_md_objs = []
+    over_all_md_objs += create_md_summary(openapi)
+    over_all_md_objs += create_md_paths(openapi)
+
+    save_md_doc(over_all_md_objs, "test.md")
